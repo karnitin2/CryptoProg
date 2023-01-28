@@ -1,32 +1,23 @@
-#include <string>
-#include <iostream>
-#include <string>
-#include <fstream>
-#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
 #include <cryptopp/cryptlib.h>
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+#include <cryptopp/md5.h>
 #include <cryptopp/hex.h>
 #include <cryptopp/files.h>
-#include <cryptopp/md5.h> // MD5
-#include <cryptopp/pwdbased.h>
-#include <cryptopp/filters.h>
-
+#include <iostream>
+using namespace CryptoPP;
 using namespace std;
-using namespace CryptoPP; 
-
 int main()
 {
-	ifstream fs;        //входной поток для чтения файлов
-	string str;
-	string strs="";
-	string file = "test";  // в переменную файла указываем имя файла которое будем открывать для чтения
-	fs.open(file);  // открытие файла
-	while (!fs.eof()) {  //цикл,пока не достигнет конца файла
-		getline(fs, str); //считываем строку
-		strs = strs+str;  //в переменную strs добавляем эту строку
-	}
-	cout << strs;  // выводим на экран
-	string hesh;   // оперделяем строку для хранения хэша
-	CryptoPP::Weak1::MD5 hashmd4;  //определяем переменную для типа хэша из библиотеки CryptoPP
-	CryptoPP::StringSource(strs, true, new CryptoPP::HashFilter(hashmd4,new CryptoPP::HexEncoder(new CryptoPP::StringSink(hesh)))); //вычисление хэша от всех считанных строк с помощью библиотеки
-	cout << endl<<hesh; //выводим на экран
+    string hashMsg, msg;
+    FileSource("/home/stud/4/4", true, new StringSink(msg));
+    msg.resize(msg.size() - 1);
+    cout << "Text from file: " << msg << endl;
+    HexEncoder encoder(new FileSink(cout));
+    Weak::MD5 hash;
+    hash.Update((const byte*)&msg[0], msg.size());
+    hashMsg.resize(hash.DigestSize());
+    hash.Final((byte*)&hashMsg[0]);
+    cout << "Text HASH: ";
+    StringSource(hashMsg, true, new Redirector(encoder));
+    cout <<"\n";
 }
