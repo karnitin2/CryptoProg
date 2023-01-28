@@ -1,129 +1,93 @@
-#include <cryptopp/cryptlib.h>
-#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
-#include <cryptopp/md5.h>
-#include <cryptopp/hex.h>
-#include <cryptopp/files.h>
-#include <cryptopp/pwdbased.h>
+#include <iostream>
+#include <string>
+#include <fstream>
 #include <cryptopp/modes.h>
 #include <cryptopp/osrng.h>
-#include <cryptopp/tiger.h>
-#include <iostream>
+#include "cryptopp/cryptlib.h"
+#include "cryptopp/pwdbased.h"
+#include "cryptopp/sha.h"
+#include "cryptopp/hex.h"
+#include <cryptopp/aes.h>
+#include <cryptopp/files.h>
+#include <cryptopp/rijndael.h>
 using namespace CryptoPP;
 using namespace std;
-
-int main() {
-    string mode, input_file_string, output_file_string, pass;
-    cout << "Welcome! Enter working mode(encrypt or decrypt): ";
-    cin >> mode;
-    if (mode != "encrypt" && mode != "decrypt") {
-        cerr << "Invalid working mode" << endl;
-        return 1;
+int main(int argc, char* argv[])
+{
+    string pass, input, output, ed;
+    cout << "e - encryption d - decryption:" << endl;
+    cout << "Введите режим e/d:" << endl;
+    cin >> ed;
+    if(ed == "e") {
+       cout << "Создайте пароль:" << endl;
+       cin >> pass;
+       cout << "Укажите путь к файлу записи:" << endl;
+       cin >> input;
+       cout << "Укажите путь к файлу чтения:" << endl;
+       cin >> output;
+       byte bPass[pass.size()];
+       StringSource(pass, true, new HexEncoder(new ArraySink(bPass, sizeof(bPass))));
+       size_t plen = strlen((const char*)bPass);
+       AutoSeededRandomPool GSALT;
+       byte SALT[AES::BLOCKSIZE];
+       GSALT.GenerateBlock(SALT, sizeof(SALT));
+       size_t slen = strlen((const char*)SALT);//
+       byte key[SHA256::DIGESTSIZE];
+       PKCS12_PBKDF<SHA256> bibl;
+       byte purpose = 0;
+       bibl.DeriveKey(key, sizeof(key),
+                      purpose, bPass,
+                      plen, SALT,
+                      slen, 1024,
+                      0.0f);
+       AutoSeededRandomPool GVI;
+       byte IV[AES::BLOCKSIZE];
+       GVI.GenerateBlock(IV, sizeof(IV));
+       ofstream userPass("/home/stud/C++Projects/C++Project/Pract4_2/Initial/userPass");
+       StringSource(pass, true, new FileSink(userPass));
+       ofstream userKey("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileKey");
+       ArraySource(key, sizeof(key), true, new FileSink(userKey));
+       ofstream userIV("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileIV");
+       ArraySource(IV, sizeof(IV), true, new FileSink(userIV));
+       CBC_Mode<AES>::Encryption ECBC; //ОбЪект шифратора
+       ECBC.SetKeyWithIV(key, sizeof(key), IV);
+       ifstream inputf(input);
+       ofstream outputf(output);
+       FileSource(inputf, true, new StreamTransformationFilter(ECBC, new
+       FileSink(outputf)));
+       inputf.close();
+       outputf.close();
+    } else if(ed == "d") {
+       string pass; //Чтение пароля
+       cout << "Пароль:" << endl;
+       string passNow; //Чтение пароля
+       cin >> passNow;
+       FileSource("/home/stud/C++Projects/C++Project/Pract4_2/Initial/userPass",
+                   true, new StringSink(pass));
+       if (pass != passNow) { //Проверка пароля
+          cout << "Неправильный пароль\n";
+          return 1;
+       }
+       cout << "Укажите путь к файлу записи:" << endl;
+       cin >> input;
+       cout << "Укажите путь к файлу чтения:" << endl;
+       cin >> output;
+       byte key[SHA256::DIGESTSIZE]; //Чтение ключа
+       FileSource("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileKey",
+                   true, new ArraySink(key, sizeof(key)));
+       byte IV[AES::BLOCKSIZE]; //Чтение IV
+       FileSource("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileIV",
+                   true, new ArraySink(IV, sizeof(IV)));
+       CBC_Mode<AES>::Decryption DCBC; //ОбЪект дешифратора
+       DCBC.SetKeyWithIV(key, sizeof(key), IV);
+       ifstream inputf(input);
+       ofstream outputf(output);
+       FileSource(inputf, true, new StreamTransformationFilter(DCBC, new
+FileSink(outputf)));
+       inputf.close();
+       outputf.close();
+    } else {
+       cerr << "Ошибка: неправильный режим - " << ed << endl;
+       exit(1);
     }
-    cout << "Enter password: ";
-    cin >> pass;
-    if(pass.size() < 8) {
-        cerr << "Error! Too short password\n";
-        return 1;
-    }
-    for(char c : pass){
-        if(c < '!' or c > '~') {
-            cout << "Invalid symbol in password" << endl;
-            return 1;
-        }
-    }
-    if (mode == "encrypt") {
-        cout << "Enter input file(or enter default): ";
-        cin >> input_file_string;
-        if(input_file_string == "default")
-            input_file_string = "test";
-        ifstream input_check(input_file_string);
-        if(input_check.is_open() == 0) {
-            cerr << "Invalid input file\n";
-            return 1;
-        }
-        input_check.close();
-        
-        cout << "Enter output file(or enter default): ";
-        cin >> output_file_string;
-        if(output_file_string == "default")
-            output_file_string = "encrypted_text_file";
-        ifstream output_check(output_file_string);
-        if(output_check.is_open() == 0) {
-            cerr << "Invalid output file\n";
-            return 1;
-        }
-        output_check.close();
-        
-        byte pass_b[pass.size()];
-        StringSource(pass, true, new HexEncoder(new ArraySink(pass_b, sizeof(pass_b)))); 
-        size_t plen = strlen((const char*)pass_b);
-        AutoSeededRandomPool SALT_gen;
-        byte SALT[AES::BLOCKSIZE];
-        SALT_gen.GenerateBlock(SALT, sizeof(SALT));
-        byte key[Tiger::DIGESTSIZE];
-        size_t slen = strlen((const char*)SALT);
-        PKCS5_PBKDF1<Tiger> key_obj;
-        byte unused = 0;
-        
-        key_obj.DeriveKey(key, sizeof(key), unused, pass_b, plen, SALT, slen, 128, 0.0f);
-        AutoSeededRandomPool prng;
-        byte IV[ AES::BLOCKSIZE ];
-        prng.GenerateBlock(IV, sizeof(IV));
-        
-        ofstream user_password_file("user_password_file");
-        StringSource(pass, true, new FileSink(user_password_file));
-        ofstream key_file("key_file");
-        ArraySource(key, sizeof(key), true, new FileSink(key_file));
-        ofstream IV_file("iv_file");
-        ArraySource(IV, sizeof(IV), true, new FileSink(IV_file));
-        
-        CBC_Mode< AES >::Encryption encryptor;
-        encryptor.SetKeyWithIV(key, sizeof(key), IV );
-        ifstream input_file(input_file_string);
-        ofstream output_file(output_file_string);
-        FileSource(input_file, true, new StreamTransformationFilter( encryptor, new FileSink(output_file)));
-        input_file.close();
-        output_file.close();
-        }
-    
-    else if (mode == "decrypt") {
-        string user_pass;
-        FileSource("user_password_file", true, new StringSink(user_pass));
-        if (pass == user_pass) {
-            cout << "Invalid password\n";
-            return 1;
-        }
-        cout << "Enter input file(or enter default): ";
-        cin >> input_file_string;
-        if(input_file_string == "default")
-            input_file_string = "encrypted_text_file";
-        ifstream input_check(input_file_string);
-        if(input_check.is_open() == 0) {
-            cerr << "Invalid input file" << endl;
-            return 1;
-        }
-        input_check.close();
-        
-        cout << "Enter output file(or enter default): ";
-        cin >> output_file_string;
-        if(output_file_string == "default")
-            output_file_string = "decrypted_text_file";
-        ifstream output_check(output_file_string);
-        if(output_check.is_open() == 0) {
-            cerr << "Invalid output file" << endl;
-            return 1;
-        }
-        output_check.close();
-        
-        byte key[Tiger::DIGESTSIZE];
-        FileSource("key_file", true, new ArraySink(key, sizeof(key)));
-        byte IV[ AES::BLOCKSIZE ];
-        FileSource("iv_file", true, new ArraySink(IV, sizeof(IV)));
-        
-        CBC_Mode< AES >::Decryption decryptor;
-        decryptor.SetKeyWithIV(key, sizeof(key), IV);
-        ifstream input_file(input_file_string);
-        ofstream output_file(output_file_string);
-        FileSource(input_file, true, new StreamTransformationFilter( decryptor, new FileSink(output_file)));
-        }
-    }
+}
