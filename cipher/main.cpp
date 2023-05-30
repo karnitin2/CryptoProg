@@ -1,93 +1,36 @@
-#include <iostream>
-#include <string>
-#include <fstream>
-#include <cryptopp/modes.h>
-#include <cryptopp/osrng.h>
-#include "cryptopp/cryptlib.h"
-#include "cryptopp/pwdbased.h"
-#include "cryptopp/sha.h"
-#include "cryptopp/hex.h"
-#include <cryptopp/aes.h>
+#include <cryptopp/cryptlib.h>
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+#include <cryptopp/md5.h>
+#include <cryptopp/hex.h>
 #include <cryptopp/files.h>
-#include <cryptopp/rijndael.h>
+#include <iostream>
 using namespace CryptoPP;
 using namespace std;
-int main(int argc, char* argv[])
+
+int main()
 {
-    string pass, input, output, ed;
-    cout << "e - encryption d - decryption:" << endl;
-    cout << "Введите режим e/d:" << endl;
-    cin >> ed;
-    if(ed == "e") {
-       cout << "Создайте пароль:" << endl;
-       cin >> pass;
-       cout << "Укажите путь к файлу записи:" << endl;
-       cin >> input;
-       cout << "Укажите путь к файлу чтения:" << endl;
-       cin >> output;
-       byte bPass[pass.size()];
-       StringSource(pass, true, new HexEncoder(new ArraySink(bPass, sizeof(bPass))));
-       size_t plen = strlen((const char*)bPass);
-       AutoSeededRandomPool GSALT;
-       byte SALT[AES::BLOCKSIZE];
-       GSALT.GenerateBlock(SALT, sizeof(SALT));
-       size_t slen = strlen((const char*)SALT);//
-       byte key[SHA256::DIGESTSIZE];
-       PKCS12_PBKDF<SHA256> bibl;
-       byte purpose = 0;
-       bibl.DeriveKey(key, sizeof(key),
-                      purpose, bPass,
-                      plen, SALT,
-                      slen, 1024,
-                      0.0f);
-       AutoSeededRandomPool GVI;
-       byte IV[AES::BLOCKSIZE];
-       GVI.GenerateBlock(IV, sizeof(IV));
-       ofstream userPass("/home/stud/C++Projects/C++Project/Pract4_2/Initial/userPass");
-       StringSource(pass, true, new FileSink(userPass));
-       ofstream userKey("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileKey");
-       ArraySource(key, sizeof(key), true, new FileSink(userKey));
-       ofstream userIV("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileIV");
-       ArraySource(IV, sizeof(IV), true, new FileSink(userIV));
-       CBC_Mode<AES>::Encryption ECBC; //ОбЪект шифратора
-       ECBC.SetKeyWithIV(key, sizeof(key), IV);
-       ifstream inputf(input);
-       ofstream outputf(output);
-       FileSource(inputf, true, new StreamTransformationFilter(ECBC, new
-       FileSink(outputf)));
-       inputf.close();
-       outputf.close();
-    } else if(ed == "d") {
-       string pass; //Чтение пароля
-       cout << "Пароль:" << endl;
-       string passNow; //Чтение пароля
-       cin >> passNow;
-       FileSource("/home/stud/C++Projects/C++Project/Pract4_2/Initial/userPass",
-                   true, new StringSink(pass));
-       if (pass != passNow) { //Проверка пароля
-          cout << "Неправильный пароль\n";
-          return 1;
-       }
-       cout << "Укажите путь к файлу записи:" << endl;
-       cin >> input;
-       cout << "Укажите путь к файлу чтения:" << endl;
-       cin >> output;
-       byte key[SHA256::DIGESTSIZE]; //Чтение ключа
-       FileSource("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileKey",
-                   true, new ArraySink(key, sizeof(key)));
-       byte IV[AES::BLOCKSIZE]; //Чтение IV
-       FileSource("/home/stud/C++Projects/C++Project/Pract4_2/Initial/fileIV",
-                   true, new ArraySink(IV, sizeof(IV)));
-       CBC_Mode<AES>::Decryption DCBC; //ОбЪект дешифратора
-       DCBC.SetKeyWithIV(key, sizeof(key), IV);
-       ifstream inputf(input);
-       ofstream outputf(output);
-       FileSource(inputf, true, new StreamTransformationFilter(DCBC, new
-FileSink(outputf)));
-       inputf.close();
-       outputf.close();
-    } else {
-       cerr << "Ошибка: неправильный режим - " << ed << endl;
-       exit(1);
-    }
+    string gsm, msg, result, result1;
+    FileSource("/home/stud/C++Projects/4pract/hash/text_1.txt", true, new StringSink(msg));
+    msg.resize(msg.size() - 1);
+    cout << "Text from file: " << msg << endl;
+    HexEncoder encoder(new StringSink(result));
+    Weak::MD5 hash;
+    hash.Update((const byte*)&msg[0], msg.size());
+    gsm.resize(hash.DigestSize());
+    hash.Final((byte*)&gsm[0]);
+    cout << "HASH: ";
+    StringSource(gsm, true, new Redirector(encoder));
+    cout << result << "\n\n";
+    // Блок для проверки работоспособности кода выше:
+    HexEncoder encoder1(new StringSink(result1));
+    string gsm1, msg1 = "russian forward";
+    cout << "Text: " << msg1 << endl;
+    hash.Update((const byte*)&msg1[0], msg1.size());
+    gsm1.resize(hash.DigestSize());
+    hash.Final((byte*)&gsm1[0]);
+    cout << "HASH: ";
+    StringSource(gsm1, true, new Redirector(encoder1));
+    cout << result1 << endl;
+    if (result == result1)
+        cout << "\nAll right\n";
 }
