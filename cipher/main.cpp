@@ -1,36 +1,46 @@
-#include <cryptopp/cryptlib.h>
-#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
-#include <cryptopp/md5.h>
-#include <cryptopp/hex.h>
-#include <cryptopp/files.h>
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <cstring>
+#include <cryptopp/cryptlib.h>
+#include <cryptopp/sha.h>
+#include <cryptopp/filters.h>
+#include <cryptopp/files.h>
+#include <cryptopp/modes.h>
+#include <cryptopp/aes.h>
+
 using namespace CryptoPP;
 using namespace std;
 
 int main()
 {
-    string gsm, msg, result, result1;
-    FileSource("/home/stud/C++Projects/4pract/hash/text_1.txt", true, new StringSink(msg));
-    msg.resize(msg.size() - 1);
-    cout << "Text from file: " << msg << endl;
-    HexEncoder encoder(new StringSink(result));
-    Weak::MD5 hash;
-    hash.Update((const byte*)&msg[0], msg.size());
-    gsm.resize(hash.DigestSize());
-    hash.Final((byte*)&gsm[0]);
-    cout << "HASH: ";
-    StringSource(gsm, true, new Redirector(encoder));
-    cout << result << "\n\n";
-    // Блок для проверки работоспособности кода выше:
-    HexEncoder encoder1(new StringSink(result1));
-    string gsm1, msg1 = "russian forward";
-    cout << "Text: " << msg1 << endl;
-    hash.Update((const byte*)&msg1[0], msg1.size());
-    gsm1.resize(hash.DigestSize());
-    hash.Final((byte*)&gsm1[0]);
-    cout << "HASH: ";
-    StringSource(gsm1, true, new Redirector(encoder1));
-    cout << result1 << endl;
-    if (result == result1)
-        cout << "\nAll right\n";
+    int mode;
+    cout << "Введите режим работы (0-зашифрование, 1-расшифрование): ";
+    cin >> mode;
+
+    string inputFilename, outputFilename, password;
+    cout << "Введите имя файла с исходными данными: ";
+    cin >> inputFilename;
+    cout << "Введите имя файла для записи результата: ";
+    cin >> outputFilename;
+    cout << "Введите пароль: ";
+    cin >> password;
+
+    byte key[SHA256::DIGESTSIZE];
+    SHA256().CalculateDigest(key, (byte*)password.c_str(), password.length());
+
+    byte iv[AES::BLOCKSIZE];
+    memset(iv, 0x00, AES::BLOCKSIZE);
+
+    if (mode == 0) {
+        cout << "Зашифрование файла " << inputFilename << " в файл " << outputFilename << endl;
+        CBC_Mode<AES>::Encryption encryptor(key, sizeof(key), iv);
+        FileSource(inputFilename.c_str(), true, new StreamTransformationFilter(encryptor, new FileSink(outputFilename.c_str())));
+    } else {
+        cout << "Расшифрование файла " << inputFilename << " в файл " << outputFilename << endl;
+        CBC_Mode<AES>::Decryption decryptor(key, sizeof(key), iv);
+        FileSource(inputFilename.c_str(), true, new StreamTransformationFilter(decryptor, new FileSink(outputFilename.c_str())));
+    }
+
+    return 0;
 }
