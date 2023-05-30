@@ -1,22 +1,10 @@
-.PHONY: all debug release clean
+all: encryption decryption
 
-RELEASE_FLAGS = -O2 -Wall -DNDEBUG
-DEBUG_FLAGS   = -g -O0 -Wall
-RELEASE_EXEC  = pract_4
-DEBUG_EXEC    = pract_4-dbg
-SOURCE        = main.cpp
+encryption: encryption.cpp
+ g++ -g -O2 -Wall -Wextra -o encryption encryption.cpp -lcryptopp
 
-all: debug release
-
-debug: $(DEBUG_EXEC)
-
-$(DEBUG_EXEC): $(SOURCE)
-	g++ $(DEBUG_FLAGS) $(SOURCE) -o $(DEBUG_EXEC) 
-
-release: $(RELEASE_EXEC)
-
-$(RELEASE_EXEC): $(SOURCE)
-	g++ $(RELEASE_FLAGS) $(SOURCE) -o $(RELEASE_EXEC)
+decryption: decryption.cpp
+ g++ -g -O2 -Wall -Wextra -o decryption decryption.cpp -lcryptopp
 
 clean:
-	rm -f $(RELEASE_EXEC) $(DEBUG_EXEC)
+ rm -f encryption decryption
